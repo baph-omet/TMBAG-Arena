@@ -1,0 +1,30 @@
+@import url(http://fonts.googleapis.com/css?family=Lato);
+
+body {
+	background-color:#222;
+}
+
+* {
+	color:white;
+	font-family: 'Lato', sans-serif;
+}
+
+img, div {
+	width: 1000px;
+	margin: 20px auto;
+	display:inherit;
+}
+
+#game {
+	width:1000px;
+	height:500px;
+	background:white;
+}
+
+code {
+	font-family: monospace;
+	  background-color: #aaa;
+	  padding: 0px 5px;
+	  border-radius: 2px;
+	  color: black;
+}
