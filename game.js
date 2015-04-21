@@ -198,7 +198,6 @@ function Enemy() {
 	Actor.call(this);
 	
 	this.specialAttack = function() {
-		//TODO: How enemies use special attacks
 		// Generate an array of usable specials
 		var usableSpecials = [];
 		for (var i=0;i < this.specials.length;i++){
@@ -220,6 +219,9 @@ function Enemy() {
 			special = usableSpecials[Math.floor(Math.random() * (usableSpecials.length - 1))];
 			updateOutput(this.name + " used " + special.name + "!");
 			this.sp -= special.cost;
+			// Disable critical hits until after the attack is finished
+			var critChancePlaceholder = this.critChance;
+			this.critChance = 0;
 			switch (special.attackType) {
 				case "player":
 					var strengthPlaceholder = this.strength;
@@ -284,6 +286,7 @@ function Enemy() {
 					this.strength = strengthPlaceholder;
 					break;*/
 			}
+			this.critChance = critChancePlaceholder;
 		}
 	}
 	
