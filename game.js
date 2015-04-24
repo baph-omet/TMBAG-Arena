@@ -33,7 +33,11 @@ function Actor() {
 		this.spr.interactive = true;
 		this.spr.buttonMode = true;
 		// Set up a click event on the sprite that if the player is in the target select mode, clicking on the sprite will return the actor as the target and change the state back to battle mode
+<<<<<<< HEAD
 		this.spr.click = this.spr.tap = function(data) {
+=======
+		this.spr.click = function(data) {
+>>>>>>> origin/gh-pages
 			if(state == targetSelectMode){
 				target = self;
 				state = battle;
