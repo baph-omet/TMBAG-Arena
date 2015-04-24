@@ -33,7 +33,7 @@ function Actor() {
 		this.spr.interactive = true;
 		this.spr.buttonMode = true;
 		// Set up a click event on the sprite that if the player is in the target select mode, clicking on the sprite will return the actor as the target and change the state back to battle mode
-		this.spr.click = function(data) {
+		this.spr.click = this.spr.tap = function(data) {
 			if(state == targetSelectMode){
 				target = self;
 				state = battle;
@@ -673,7 +673,7 @@ function setup() {
 		battleActions.addChild(txt);
 		txt.interactive = true;
 		txt.buttonMode = true;
-		txt.click = function(data) {
+		txt.click = txt.tap = function(data) {
 			action = this.text;
 			//console.log(action);
 		}
@@ -724,12 +724,12 @@ function setup() {
 	
 	// Register event listeners
 	//// When the "Click to Start" text is clicked
-	startText.click = function(data) {
+	startText.click = startText.tap = function(data) {
 		state = preBattle;
 	}
 	
 	//// When the Begin wave button is clicked
-	waveStart.click = function(data) {
+	waveStart.click = waveStart.tap = function(data) {
 		state = battle;
 	}
 	
@@ -890,7 +890,7 @@ function battle() {
 								battleActions.addChild(txt);
 								txt.interactive = true;
 								txt.buttonMode = true;
-								txt.click = function(data) {
+								txt.click = txt.tap = function(data) {
 									var j=0;
 									var found = false;
 									while(!found && j<player.specials.length) {
