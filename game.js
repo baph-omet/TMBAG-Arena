@@ -1,3 +1,7 @@
+/* * * * *
+This JavaScript program was created entirely by me (all 1000+ lines of it!). The pixi.js script was provided by the PIXI.js team.
+* * * * */
+
 // create an new instance of a pixi stage
 var stage = new PIXI.Stage(0x666666);
 stage.interactive = true;
@@ -8,37 +12,44 @@ var renderer = PIXI.autoDetectRenderer(1000, 500, {antialiasing: true});
 // add the renderer view element to the DOM
 document.getElementById("game").appendChild(renderer.view);
 
+// Create global variables
 var player,state,target,action,selectedSpecial,title,startText,output,waveCounter,waveStart,gameScene,titleScene,battleActions,preBattleText,targetSelectInstructionText,gameOverText,playerStatText,runAwayText;
 var actionTexts = [];
 var specialTexts = [];
 var enemies = [];
 var wave = 1;
+
+// Set up the asset loader and load all sprites from the JSON hash file
 var loader = new PIXI.AssetLoader(["images/sprites.json"]);
-//"dungeon.png","player.png","cloak.png","eyeball.png","phantom.png","dagger.png"
 loader.onComplete = setup;
 loader.load();
 
+// Define the Actor class, a superclass for both Player and Enemy
 function Actor() {
+	// Set the object's sprite based on its name
 	this.setSprite = function() {
 		var self = this;
 		this.spr = new PIXI.Sprite(PIXI.TextureCache[this.name.toLowerCase() + ".png"]);
 		this.spr.interactive = true;
 		this.spr.buttonMode = true;
-		this.spr.click = function(data) {
+		// Set up a click event on the sprite that if the player is in the target select mode, clicking on the sprite will return the actor as the target and change the state back to battle mode
+		this.spr.click = this.spr.tap = function(data) {
 			if(state == targetSelectMode){
 				target = self;
 				state = battle;
-				//console.log("state is: " + state.name + " target is: ");
-				//console.log(target);
 			}
 			
 		}
 	}
 	
+	// How all actors attack
 	this.attack = function(target) {
+		// If the attack misses, otherwise...
 		if (Math.random() > this.accuracy) {
 			updateOutput(this.name + "'s attack missed!");
 		} else {
+			// Roll for a critical hit
+			// Either way, damage is the difference of the caller's strength and the target's defense
 			var damage;
 			if (Math.random() < this.critChance) {
 				updateOutput("Critical hit!");
@@ -46,6 +57,8 @@ function Actor() {
 			} else {
 				damage = this.strength - target.defense;
 			}
+			
+			// If there is any damage at all
 			if(damage > 0) {
 				damage = Math.round(damage);
 				updateOutput(this.name + " Attacked " + target.name + ", dealing " + damage + " damage!")
@@ -56,6 +69,7 @@ function Actor() {
 		}
 	}
 	
+	// How all actors defend themselves
 	this.defend = function() {
 		if (!this.defending) {
 			this.defense += this.strength;
@@ -64,6 +78,7 @@ function Actor() {
 		}
 	}
 	
+	// Removes defending state from an actor
 	this.unDefend = function() {
 		if(this.defending) {
 			this.defense -= this.strength;
@@ -74,9 +89,12 @@ function Actor() {
 	
 }
 
+// Player class
 function Player() {
+	// Call to superclass
 	Actor.call(this);
 	
+	// Player stats, mutable
 	this.name = "PLAYER";
 	this.level = 1;
 	this.health = 10;
@@ -94,19 +112,21 @@ function Player() {
 	
 	this.setSprite();
 	
+	// How the player examines enemies
 	this.examine = function(target) {
-		//console.log("The player examined an enemy!");
 		updateOutput(player.name + " examined the enemy!");
 		updateOutput(target.name + ": " + target.description);
 		updateOutput("HP: " + target.health + "/" + target.maxHealth + " SP: " + target.sp + "/" + target.maxSp + " STR: " + target.strength + " DEF: " + target.defense + " ACC: " + Math.round(target.accuracy * 100) + "% CRIT: " + Math.round(target.critChance * 100) + "%");
 	}
 	
+	// How the player runs away
 	this.run = function() {
-		//console.log("The player fled like a coward!");
 		state = runAway;
 	}
 	
+	// How the player levels up
 	this.levelUp = function() {
+		// Roll EXP over to the next level
 		this.experience = this.experience - this.expNextLevel;
 		if(this.experience < 0) {
 			this.experience = 0;
@@ -114,6 +134,7 @@ function Player() {
 		this.level += 1;
 		updateOutput("-=-=- Level up! -=-=-")
 		
+		// Increase stats
 		this.expNextLevel *= 2;
 		this.critChance += 0.02;
 		this.maxHealth += 3;
@@ -123,28 +144,37 @@ function Player() {
 		if (this.level % 2 == 1){this.defense += 1;}
 		else {this.strength += 1}
 		updateOutput("LV: " + this.level + " STR: " + this.strength + " DEF: " + this.defense + " HP: " + this.maxHealth + " SP: " + this.maxSp + " CRIT: " + Math.round(this.critChance * 100) + "%");
+		
+		// Check to see if the player can learn any special attacks at this new level
 		for (var special in specialAttacks) {
 			if (specialAttacks[special].levelLearned == this.level) {
 				this.specials.push(specialAttacks[special]);
 				updateOutput("Learned Special Attack " + specialAttacks[special].name + "!");
 			}
 		}
+		
+		// Continue leveling up until the player doesn't have enough EXP
 		if (this.experience > this.expNextLevel) {
 			this.levelUp();
 		}
 	}
 	
+	// How players do special attacks
 	this.specialAttack = function(special,target) {
 		updateOutput(this.name + " used " + special.name + "!");
 		this.sp -= special.cost;
+		
+		// How to execute the special attack based on what type of special it is
 		switch (special.attackType) {
 			case "single":
+				// single specials are basically just powered-up attacks
 				var strengthPlaceholder = this.strength;
 				this.strength *= special.damageMultiplier;
 				this.attack(target);
 				this.strength = strengthPlaceholder;
 				break;
 			case "all":
+				// "all" specials attack all enemies
 				var strengthPlaceholder = this.strength;
 				this.strength * special.damageMultiplier;
 				for(var i=0;i<target.length;i++){
@@ -153,14 +183,17 @@ function Player() {
 				this.strength = strengthPlaceholder;
 				break;
 			case "self":
+				// "self" specials heal the player
 				var healing = Math.floor(this.maxHealth * special.healPercent / 100);
-				this.health += healing
-				if(this.health > this.maxHealth) {
-					this.health = this.maxHealth;
+				// The player can't overheal themselves
+				if(healing > (this.maxHealth - this.health)) {
+					healing = this.maxHealth - this.health;
 				}
+				this.health += healing;
 				updateOutput(player.name + " recovered " + healing + " HP!");
 				break;
 			case "sp":
+				// "sp" specials drain SP from enemies (literally just a clone of PSI Magnet Omega from Earthbound)
 				var totalDrained = 0;
 				var strengthPlaceholder = this.strength;
 				this.strength *= special.damageMultiplier;
@@ -185,6 +218,7 @@ function Player() {
 		
 	}
 	
+	// A quick function to give the player EXP and check for levelup
 	this.giveExp = function(amount) {
 		this.experience += amount;
 		if(this.experience >= this.expNextLevel) {
@@ -194,11 +228,12 @@ function Player() {
 	
 }
 
+// Enemy class, superclass for all enemy types
 function Enemy() {
 	Actor.call(this);
 	
+	// Enemies handle special attacks differently than the player
 	this.specialAttack = function() {
-		//TODO: How enemies use special attacks
 		// Generate an array of usable specials
 		var usableSpecials = [];
 		for (var i=0;i < this.specials.length;i++){
@@ -220,6 +255,9 @@ function Enemy() {
 			special = usableSpecials[Math.floor(Math.random() * (usableSpecials.length - 1))];
 			updateOutput(this.name + " used " + special.name + "!");
 			this.sp -= special.cost;
+			// Disable critical hits until after the attack is finished
+			var critChancePlaceholder = this.critChance;
+			this.critChance = 0;
 			switch (special.attackType) {
 				case "player":
 					var strengthPlaceholder = this.strength;
@@ -284,9 +322,11 @@ function Enemy() {
 					this.strength = strengthPlaceholder;
 					break;*/
 			}
+			this.critChance = critChancePlaceholder;
 		}
 	}
 	
+	// How the enemy decides which behavior to execute (spoiler: it's random)
 	this.chooseBehavior = function() {
 		var choice = Math.random();
 		var actionChoice;
@@ -301,6 +341,7 @@ function Enemy() {
 	}
 }
 
+// Cloak enemy class
 function Cloak() {
 	// Call to superclass
 	Enemy.call(this);
@@ -331,6 +372,7 @@ function Cloak() {
 	this.setSprite();
 }
 
+// Eyeball enemy class
 function Eyeball() {
 	Enemy.call(this);
 	
@@ -360,6 +402,7 @@ function Eyeball() {
 	this.setSprite();
 }
 
+// Phantom enemy class
 function Phantom() {
 	Enemy.call(this);
 	
@@ -385,6 +428,7 @@ function Phantom() {
 	this.setSprite();
 }
 
+// Dagger enemy class
 function Dagger() {
 	Enemy.call(this);
 	
@@ -410,6 +454,7 @@ function Dagger() {
 	this.setSprite();
 }
 
+// Definition of all player specials
 var specialAttacks = {
 	heavyStrike: {
 		name: "Heavy Strike",
@@ -441,6 +486,7 @@ var specialAttacks = {
 	}
 }
 
+// Definition of all enemy specials
 var enemySpecials = {
 	deathBlink: {
 		name: "Death Blink",
@@ -475,6 +521,7 @@ var enemySpecials = {
 	}
 }
 
+// Setup all graphics elements
 function setup() {
 	var backdrop = new PIXI.Sprite(PIXI.TextureCache["dungeon.png"]);
 	stage.addChild(backdrop);
@@ -626,7 +673,7 @@ function setup() {
 		battleActions.addChild(txt);
 		txt.interactive = true;
 		txt.buttonMode = true;
-		txt.click = function(data) {
+		txt.click = txt.tap = function(data) {
 			action = this.text;
 			//console.log(action);
 		}
@@ -677,12 +724,12 @@ function setup() {
 	
 	// Register event listeners
 	//// When the "Click to Start" text is clicked
-	startText.click = function(data) {
+	startText.click = startText.tap = function(data) {
 		state = preBattle;
 	}
 	
 	//// When the Begin wave button is clicked
-	waveStart.click = function(data) {
+	waveStart.click = waveStart.tap = function(data) {
 		state = battle;
 	}
 	
@@ -690,6 +737,7 @@ function setup() {
 	gameLoop();
 }
 
+// Main game loop, repeats 60 times per second, calls whichever state the game is in
 function gameLoop() {
 
 	requestAnimFrame( gameLoop );
@@ -700,12 +748,14 @@ function gameLoop() {
 	renderer.render(stage);
 }
 
+// Title screen state, shows the title and that's about it
 function titleScreen() {
 	titleScene.visible = true;
 	preBattleText.visible = false;
 	battleActions.visible = false;
 }
 
+// pre-battle state, shows the wave counter, sets up enemies for the next wave, resets battle variables
 function preBattle() {
 	titleScene.visible = false;
 	gameScene.visible = true;
@@ -721,16 +771,20 @@ function preBattle() {
 	}
 }
 
+// battle state, handles player and enemy turns
 function battle() {
+	// show all battle-relevant graphics
 	targetSelectInstructionText.visible = false;
 	specialTexts.visible = false;
 	preBattleText.visible = false;
 	battleActions.visible = true;
-    playerStatText.setText(player.name + "|Lv" + player.level + "       Wave: " + wave + "\nHP: " + player.health + "/" + player.maxHealth + " SP: " + player.sp + "/" + player.maxSp + "\nEXP: " + player.experience + "/" + player.expNextLevel + "\nSTR: " + player.strength + " DEF: " + player.defense + " CRIT: " + Math.round(player.critChance * 100) + "%");
+    	playerStatText.setText(player.name + "|Lv" + player.level + "       Wave: " + wave + "\nHP: " + player.health + "/" + player.maxHealth + " SP: " + player.sp + "/" + player.maxSp + "\nEXP: " + player.experience + "/" + player.expNextLevel + "\nSTR: " + player.strength + " DEF: " + player.defense + " CRIT: " + Math.round(player.critChance * 100) + "%");
 	
+	// If there are no more enemies, end the wave
 	if (enemies.length == 0) {
-		//console.log("all enemies defeated!");
 		updateOutput("All enemies defeated! Wave " + wave + " defeated!");
+		
+		// If the player finished the wave with full health, give them a small EXP bonus
 		if(player.health == player.maxHealth) {
 			updateOutput("Perfect wave! +3 EXP");
 			player.giveExp(3);
@@ -741,13 +795,16 @@ function battle() {
 		return;
 	}
 	
+	// If the player is dead, switch to game over state
 	if (player.health <= 0) {
 		state = gameOver;
 		return;
 	}
 	
+	// If it is not the player's turn
 	if (!player.turn) {
 		action = "";
+		// Each enemy chooses their behavior, then acts
 		for(var i=0;i<enemies.length;i++) {
 			enemies[i].unDefend();
 			var behavior = enemies[i].chooseBehavior();
@@ -768,12 +825,14 @@ function battle() {
 		player.turn = true;
 	}
 	
+	// If it is the player's turn
 	if (player.turn && action) {
+		// If the player has a target selected
 		if (target) {
+			// Execute an action
 			switch (action) {
 				case "ATTACK":
 					player.attack(target);
-					//console.log("player attacked: " + target)
 					break;
 				case "EXAMINE":
 					player.examine(target);
@@ -787,8 +846,8 @@ function battle() {
 			target = null;
 			player.turn = false;
 		} else if (selectedSpecial) {
-			//console.log("Selected special is:");
-			//console.log(selectedSpecial);
+			// If the player does not have a target, but has selected a special attack,
+			// Handle target selection for special attacks
 			switch (selectedSpecial.attackType) {
 				case "single":
 					targetSelect(enemies);
@@ -804,19 +863,21 @@ function battle() {
 					break;
 			}
 		} else {
+			//Otherwise, determine which action the player wants to do
 			switch (action) {
 				case "EXAMINE":
 				case "ATTACK":
 					targetSelect(enemies);
-					//console.log("target is: " + target);
 					break;
 				case "DEFEND":
+					// if the player chooses to defend, no target selection is necessary
 					player.defend();
 					player.turn = false;
 					break;
 				case "SPECIAL":
 					selectedSpecial = null;
-					//console.log("special clicked, no special selected")
+					// load up the player's specials with clickable text, 
+					// then send them into the special attack selection mode
 					if (player.specials.length > 0) {
 						if(player.sp >= 1) {
 							for(var i=0; i<player.specials.length;i++){
@@ -829,7 +890,7 @@ function battle() {
 								battleActions.addChild(txt);
 								txt.interactive = true;
 								txt.buttonMode = true;
-								txt.click = function(data) {
+								txt.click = txt.tap = function(data) {
 									var j=0;
 									var found = false;
 									while(!found && j<player.specials.length) {
@@ -854,6 +915,8 @@ function battle() {
 							action = "";
 						}
 					} else {
+						// However if the player has no special attacks, 
+						// let them choose something else instead
 						updateOutput(player.name + " has no special attacks!");
 						action = "";
 					}
@@ -867,24 +930,25 @@ function battle() {
 	}	
 }
 
+// target select state, basically just tells the player to pick a target, then does nothing until they pick one
 function targetSelectMode() {
 	battleActions.visible = false;
 	targetSelectInstructionText.visible = true;
 	if (target != null) {
-		//console.log("in the select mode, target is: " + target);
 		state = battle;
 	}
 }
 
+// same as targetSelectMode, but the player picks one of their special moves instead
 function specialSelectMode() {
 	battleActions.visible = false;
 	specialTexts.visible = true;
 	if (selectedSpecial) {
-		//console.log("player selected special: " + selectedSpecial);
 		state = battle;
 	}
 }
 
+// If the player has died, show them the number of waves they have cleared
 function gameOver() {
 	gameScene.visible = false;
 	battleActions.visible = false;
@@ -892,6 +956,7 @@ function gameOver() {
 	gameOverText.setText(player.name + " has died! Game Over!\nWaves cleared: " + (wave - 1));
 }
 
+// Same as gameOver, but with different text
 function runAway() {
 	gameScene.visible = false;
 	battleActions.visible = false;
@@ -899,6 +964,9 @@ function runAway() {
 	runAwayText.setText(player.name + " has fled! Game Over!\nWaves cleared: " + (wave - 1));
 }
 
+// A function to create enemy objects and position their sprites
+// syntax: createEnemies([Enemy1,Enemy2,...,Enemy5]) -> array of enemies
+// Any enemies past index 4 are ignored
 function createEnemies(types) {
 	var enms = [];
 	for(var i = 0; i<types.length && i<5; i++) {
@@ -912,9 +980,11 @@ function createEnemies(types) {
 	return enms;
 }
 
+// How the game decides which enemies are spawned in each wave
 function wavePopulation(wave) {
 	var enemies;
 	switch (wave) {
+		// For wave 1-5, the player fights a number of Cloaks that equals the wave integer divided by 2
 		case 1:
 		case 2:
 		case 3:
@@ -927,6 +997,8 @@ function wavePopulation(wave) {
 			}
 			enemies = createEnemies(ens);
 			break;
+		// Wave 6 and beyond have custom enemy numbers
+		// Wave 6 is a boss wave
 		case 6:
 			enemies = createEnemies([Cloak,Cloak,Eyeball]);
 			break;
@@ -945,9 +1017,11 @@ function wavePopulation(wave) {
 		case 11:
 			enemies = createEnemies([Dagger,Dagger,Dagger,Phantom,Phantom]);
 			break;
+		// Wave 12 is a boss round
 		case 12:
 			enemies = createEnemies([Eyeball,Phantom,Phantom]);
 			break;
+		// Wave 13 is a Hell round
 		case 13:
 			enemies = createEnemies([Eyeball,Eyeball,Phantom,Phantom]);
 			break;
@@ -955,8 +1029,11 @@ function wavePopulation(wave) {
 	return enemies;
 }
 
+// Pushes text to the battle log
 function updateOutput(newText) {
+	// waits for a sec
 	sleep(750);
+	// tries to break the text to a new line if it's too long
 	if (newText.length > 55) {
 		var found = false;
 		for(var i=50;i<56;i++) {
@@ -970,6 +1047,7 @@ function updateOutput(newText) {
 		}
 	}
 	output.setText(output.text + "\n" + newText);
+	// Pushes the oldest line out of the log
 	var lines = output.text.split("\n");
 	while (lines.length > 7) {
 		lines.splice(0,1);
@@ -978,6 +1056,7 @@ function updateOutput(newText) {
 	console.log(newText);
 }
 
+// Handles target selection, sends the player to the target select mode if # of enemies  > 1
 function targetSelect(enemies) {
 	if (enemies.length == 1) {
 		target = enemies[0];
@@ -987,6 +1066,7 @@ function targetSelect(enemies) {
 	}
 }
 
+// Checks for dead enemies and removes them
 function removeDeadEnemies(enemies) {
 	var i = 0;
 	while(i<enemies.length) {
@@ -1001,14 +1081,13 @@ function removeDeadEnemies(enemies) {
 			}
 			gameScene.removeChild(enemies[i].spr);
 			enemies.splice(i,1);
-			//console.log("removed enemy at enemy index " + i);
-			//console.log(enemies);
 		} else {
 			i++;
 		}
 	}
 }
 
+// Sleeps the game for a split second
 function sleep(milliseconds) {
   var start = new Date().getTime();
   for (var i = 0; i < 1e7; i++) {
